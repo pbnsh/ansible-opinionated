@@ -1,4 +1,4 @@
-name: ci
+name: release
 
 on:
   push:
@@ -33,7 +33,7 @@ jobs:
       - name: release
         uses: softprops/action-gh-release@v1
         with:
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           body_path: ${{ github.workflow }}-CHANGELOG.txt
           tag_name: ${{github.ref_name}}
           files: pbn-op-*.tar.gz
