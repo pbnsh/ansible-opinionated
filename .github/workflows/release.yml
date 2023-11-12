@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: build
+        run: |
+          pip3 install ansible-core
+          ansible-galaxy collection build
+
+      - name: install parse-changelog
+        run: cargo install parse-changelog
+
+      - name: tag
+        run: |
+          echo ${{github.ref_name}}
+
+      - name: generate changelog
+        run: |
+          # version="${GITHUB_REF#refs/tags/v}"
+          version="0.0.1"
+          parse-changelog CHANGELOG.md "$version" > ${{ github.workflow }}-CHANGELOG.txt
+
+      - name: release
+        uses: softprops/action-gh-release@v1
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          body_path: ${{ github.workflow }}-CHANGELOG.txt
+          tag_name: ${{github.ref_name}}
+          files: pbn-op-*.tar.gz

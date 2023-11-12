@@ -1,0 +1,34 @@
+---
+namespace: pbn
+# name: opinionated
+name: op
+version: 0.0.1
+readme: README.md
+authors:
+  - pbn <in+github@pbn.sh>
+description: opinionated ansible collection
+license:
+  - GPL-2.0-or-later
+license_file: ''
+tags: ['inventory']
+dependencies: {}
+
+repository: https://github.com/pbnsh/ansible-opinionated/
+documentation: https://github.com/pbnsh/ansible-opinionated/blob/master/README.md
+homepage: https://github.com/pbnsh/ansible-opinionated/
+issues: https://github.com/pbnsh/ansible-opinionated/issues
+
+build_ignore:
+  - ".DS_Store"
+  - ".git"
+  - ".github"
+  - ".idea"
+  - ".pytest_cache"
+  - "__pycache__"
+  - "tests"
+  - "docs"
+  - "examples"
+  - "CHANGELOG.md"
+  - "README.md"
+  - "taskfile.yaml"
+  - "*.tar.gz"

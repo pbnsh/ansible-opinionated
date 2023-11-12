@@ -1,0 +1,22 @@
+name: ci
+
+on:
+  #push:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ansible-test sanity
+        uses: ansible-community/ansible-test-gh-action@release/v1
+        with:
+          ansible-core-version: stable-2.14
+          testing-type: sanity
+      - name: ansible-test units
+        uses: ansible-community/ansible-test-gh-action@release/v1
+        with:
+          ansible-core-version: stable-2.14
+          testing-type: units

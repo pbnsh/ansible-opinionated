@@ -1,0 +1,49 @@
+---
+version: '3'
+
+# test dir have to be outside of .gitignore ot ansible-test will fail
+# https://github.com/ansible/ansible/issues/59991
+vars:
+  TEST_DIR: "/tmp/test-pbn-op"
+
+tasks:
+  default:
+    silent: true
+    cmds:
+      - task --list
+
+  black:
+    desc: black
+    cmds:
+      - black plugins
+
+  prepare:
+    internal: true
+    cmds:
+      - mkdir '{{.TEST_DIR}}/ansible_collections/pbn/op/' || true
+      - ansible-galaxy collection install {{.PWD}} -p {{.TEST_DIR}} --force
+
+  sanity:
+    desc: ansible-test sanity
+    cmds:
+      - task: prepare
+      - defer: { task: cleanup }
+      - cd {{.TEST_DIR}}/ansible_collections/pbn/op/ && ansible-test sanity --docker
+
+  units:
+    desc: ansible-test unit
+    cmds:
+      - task: prepare
+      - defer: { task: cleanup }
+      - cp -r tests {{.TEST_DIR}}/ansible_collections/pbn/op/
+      - cd {{.TEST_DIR}}/ansible_collections/pbn/op/ && ansible-test units --docker -v
+
+  all:
+    desc: black, sanity, unit
+    cmds:
+      - task: black
+      - task: prepare
+      - task: sanity
+      - task: units
+
+  test::cleanup: rm -rf {{.TEST_DIR}}

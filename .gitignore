@@ -1,0 +1,12 @@
+.*
+!/.gitignore
+!/.github
+*.sw?
+*.svg
+.idea
+.DS_Store
+*.py[cod]
+*.log
+__pycache__
+venv
+*.tar.gz
