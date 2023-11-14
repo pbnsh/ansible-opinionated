@@ -46,4 +46,4 @@ tasks:
       - task: sanity
       - task: units
 
-  test::cleanup: rm -rf {{.TEST_DIR}}
+  cleanup: rm -rf {{.TEST_DIR}}

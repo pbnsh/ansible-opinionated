@@ -1,0 +1,9 @@
+---
+- hosts: "{{ pbn_role }}"
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_host: 127.0.0.1
+  tasks:
+    - include_role:
+        name: "{{ pbn_role }}"

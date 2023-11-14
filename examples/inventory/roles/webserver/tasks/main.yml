@@ -1,0 +1,26 @@
+---
+- block:
+    - debug:
+        var: pbn_provider
+
+    - debug:
+        var: pbn_site
+
+    - debug:
+        var: pbn_env
+
+    - debug:
+        var: pbn_role
+
+    - debug:
+        var: dns_servers
+
+    - debug:
+        var: ntp_servers
+
+    - debug:
+        var: host_cert_ttl
+
+    - debug:
+        var: groups[pbn_role]
+  run_once: true

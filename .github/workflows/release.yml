@@ -26,8 +26,7 @@ jobs:
 
       - name: generate changelog
         run: |
-          # version="${GITHUB_REF#refs/tags/v}"
-          version="0.0.1"
+          version="${GITHUB_REF#refs/tags/v}"
           parse-changelog CHANGELOG.md "$version" > ${{ github.workflow }}-CHANGELOG.txt
 
       - name: release

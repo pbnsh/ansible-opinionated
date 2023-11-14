@@ -30,6 +30,9 @@ sites and environments, variables defined in `_site.yml` are shared for that
 site and all environments within site, and variables defined in `_env.yml` are
 used in that environment within a site.
 
+The `_common.yml|yaml` file is always parsed, `['_site.yml', '_env.yml']` 
+variables are configurable via `inventory_var_files` config option. 
+
 Running ansible against `webserver` role in `eu-central/dev` would look like:
 
 ```
@@ -104,23 +107,24 @@ from number 2 to 10 with:
 
 ```
 1. role defaults                      - roles/$role/defaults/main.yml
+2. common iventory vars               - sites/_common.yml
 2. vars directory                     - vars/$var_dir/$identifier_var_value.yml
 3. iventory variables                 - inventory variable files merged in defined order
 4. role defaults inventory overrides  - roles/$role/defaults/main.yml (pbn_inventory_override dictionary)
-5. inventory role group vars          - site/eu-central-1/prod/$role.yml
+5. inventory role group vars          - sites/eu-central-1/prod/$role.yml
 6. playbook vars                      - playbooks/$role.yml
 ```
 
 ## Config options
 
-| Name                  | Type        | Description                                                                                                              | Required |
-|-----------------------|-------------|--------------------------------------------------------------------------------------------------------------------------|:--------:|
-| `root_dir`            | `str`       | Name of ansible root directory, usually root of git repo where ansible configs are stored.                               |   Yes    |
-| `role_source`         | `str`       | One of `inventory` (default) or `playbooks`, see [below](#role_source).                                                  |    No    |
-| `identifier_prefix`   | `str`       | Prefix used in identifier variables, defaults to `pbn`.                                                                  |    No    |
-| `inventory_var_files` | `list(str)` | Inventory variable files, that will be merged in defined order, defaults to: `['_common.yml', '_site.yml', '_env.yml']`. |    No    |
-| `var_dirs`            | `list(str)` | Names of directories defined under root_dir/vars which hold additian inventory variables, see [below](#var_dirs).        |    No    |
-| `append_dns_domain`   | `bool`      | Toggle if hostname should be appended with `pbn_dns_domain` when hostname is not fqdn, see [below](#append_dns_domain).  |    No    |
+| Name                  | Type        | Description                                                                                                             | Required |
+|-----------------------|-------------|-------------------------------------------------------------------------------------------------------------------------|:--------:|
+| `root_dir`            | `str`       | Name of ansible root directory, usually root of git repo where ansible configs are stored.                              |   Yes    |
+| `role_source`         | `str`       | One of `inventory` (default) or `playbooks`, see [below](#role_source).                                                 |    No    |
+| `identifier_prefix`   | `str`       | Prefix used in identifier variables, defaults to `pbn`.                                                                 |    No    |
+| `inventory_var_files` | `list(str)` | Inventory variable files, that will be merged in defined order, defaults to: `['_site.yml', '_env.yml']`.               |    No    |
+| `var_dirs`            | `list(str)` | Names of directories defined under root_dir/vars which hold addition inventory variables, see [below](#var_dirs).       |    No    |
+| `append_dns_domain`   | `bool`      | Toggle if hostname should be appended with `pbn_dns_domain` when hostname is not fqdn, see [below](#append_dns_domain). |    No    |
 
 All the options defined above can be set via env vars, for example `ANSIBLE_OP_INVENTORY_ROLE_SOURCE`.
 

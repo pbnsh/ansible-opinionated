@@ -1,0 +1,13 @@
+---
+pbn_dns_domain: "{{ pbn_site}}.{{ pbn_env }}.company.example"
+
+dns_servers:
+  - 1.1.1.1
+
+ntp_servers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+  - 2.pool.ntp.org
+  - 3.pool.ntp.org
+
+host_cert_ttl: 24h
