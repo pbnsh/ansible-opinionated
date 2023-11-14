@@ -15,8 +15,7 @@ From archive:
 
 ```
 VERSION=0.0.1
-wget "https://github.com/pbnsh/anisble-op-inventory/releases/download/v${VERSION}/pbn-op_inventory-${VERSION}.tar.gz
-ansible-galaxy collection install "pbn-op_inventory-${VERSION}.tar.gz"
+ansible-galaxy collection install "git+https://github.com/pbnsh/ansible-opinionated.git,v${VERSION}"
 ```
 
 Via `requirements.yml` file:

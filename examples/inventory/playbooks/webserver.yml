@@ -1,0 +1,4 @@
+---
+- import_playbook: _wrapper.yml
+  vars:
+    pbn_role: webserver
