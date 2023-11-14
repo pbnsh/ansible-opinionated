@@ -14,14 +14,14 @@
 From archive:
 
 ```
-VERSION=0.0.1
+VERSION=0.0.2
 ansible-galaxy collection install "git+https://github.com/pbnsh/ansible-opinionated.git,v${VERSION}"
 ```
 
 Via `requirements.yml` file:
 
 ```
-VERSION=0.0.1
+VERSION=0.0.2
 tee requirements.yml <<EOF > /dev/null
 collections:
   - name: https://github.com/pbnsh/ansible-opinionated.git
