@@ -53,7 +53,7 @@ options:
         description:
           - List of variable files that will searched up the tree in inventory.
           - Will fail if any of the files are not found.
-        default: ['_common.yml', '_site.yml', '_env.yml']
+        default: ['_site.yml', '_env.yml']
         type: list
         elements: string
         env:
@@ -191,10 +191,13 @@ def get_playbook(path: Path, identifier_prefix, include=None) -> dict:
     return res
 
 
-def get_inventory(path: Path, var_files: list, root_dir: str) -> dict:
+def get_inventory(
+    path: Path, var_files: list, root_dir: str, raise_on_missing=True
+) -> dict:
     """
     Searches for var_files starting from path and stops at root_dir.
 
+    :param raise_on_missing: will error if any of var_files is not found
     :param path: starts searching up the tree from path
     :param var_files: list of files to search for
     :param root_dir: directory where to stop search
@@ -210,7 +213,7 @@ def get_inventory(path: Path, var_files: list, root_dir: str) -> dict:
                 var_files_copy.pop(idx)
         path = path.parent
 
-    if var_files_copy:
+    if var_files_copy and raise_on_missing:
         raise AnsibleParserError(f"failed to find: {var_files}, aborting")
 
     res = {}
@@ -224,7 +227,7 @@ def get_inventory(path: Path, var_files: list, root_dir: str) -> dict:
     return res
 
 
-def get_role_defaults(path, identifier_prefix, playbook_vars):
+def get_role_defaults(path: Path, identifier_prefix: str, playbook_vars: dict) -> dict:
     """
     Parses roles/$role/defaults/main.yml, if base_role is defined in
     playbook_vars parses roles/$base_role/defaults/main.yml
@@ -248,7 +251,7 @@ def get_role_defaults(path, identifier_prefix, playbook_vars):
     return res
 
 
-def role_inventory_override(role_vars, identifier_prefix):
+def role_inventory_override(role_vars: dict, identifier_prefix: str) -> dict:
     """
     :param role_vars: dict of role variables
     :param identifier_prefix: internal var prefix
@@ -291,6 +294,7 @@ def template_vars(jinja_env: jinja2, role_vars: dict) -> dict:
         except (
             jinja2.exceptions.UndefinedError,
             jinja2.exceptions.TemplateAssertionError,
+            jinja2.exceptions.TemplateSyntaxError,
         ):
             pass
 
@@ -379,6 +383,13 @@ class InventoryModule(BaseInventoryPlugin):
         append_dns_domain = self.get_option("append_dns_domain")
 
         root_path = get_root_path(inventory_path, root_dir)
+
+        common_vars = get_inventory(
+            inventory_path,
+            ["_common.yaml", "_common.yml"],
+            root_path.stem,
+            raise_on_missing=False,
+        )
         inventory_vars = get_inventory(
             inventory_path, self.get_option("inventory_var_files"), root_path.stem
         )
@@ -404,6 +415,7 @@ class InventoryModule(BaseInventoryPlugin):
             self.inventory.add_group(role)
 
             role_vars = role_defaults.get(role, {})
+            role_vars |= common_vars
             role_vars |= _vars
             role_vars |= inventory_vars
             role_vars |= role_inventory_override(role_vars, identifier_prefix)
