@@ -168,11 +168,10 @@ def get_playbook(path: Path, identifier_prefix, include=None) -> dict:
     for role_filename, contents in parse_path(path, include):
         role_name, role_vars = None, None
         for item in contents:
-            if "hosts" not in item and "vars" not in item:
-                continue
-            role_name = item.get("hosts") or item["vars"].get(
-                f"{identifier_prefix}_role"
-            )
+            if "hosts" in item:
+                role_name = item.get("hosts")
+            if "vars" in item:
+                role_name = item["vars"].get(f"{identifier_prefix}_role")
             if role_name is None:
                 continue
             role_vars = item.get("vars", {})
@@ -239,11 +238,10 @@ def get_role_defaults(path: Path, identifier_prefix: str, playbook_vars: dict) -
     """
 
     res = {}
-    prefix_base_role = f"{identifier_prefix}_base_role"
     for role_name, role_vars in playbook_vars.items():
         defaults = path / role_name / "defaults" / "main.yml"
-        if prefix_base_role in role_vars:
-            defaults = path / role_vars[prefix_base_role] / "defaults" / "main.yml"
+        if "base_role" in role_vars:
+            defaults = path / role_vars["base_role"] / "defaults" / "main.yml"
         try:
             res[role_name] = data_loader.load_from_file(str(defaults))
         except AnsibleFileNotFound:
