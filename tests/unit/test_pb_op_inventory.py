@@ -145,7 +145,7 @@ class TestOpInventory(unittest.TestCase):
             yaml.dump({"base_role_var": "initial"})
         )
 
-        playbook_vars = {"test": {"test_role": "test", "test_base_role": "base_role"}}
+        playbook_vars = {"test": {"test_role": "test", "base_role": "base_role"}}
 
         role_defaults = get_role_defaults(
             self.test_dir / "roles", "test", playbook_vars

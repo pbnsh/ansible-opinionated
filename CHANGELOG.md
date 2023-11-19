@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [0.0.3] - 2023-11-19
+
+- change(inventory): treat base_role as regular variable, fix role_name lookup
+
 ## [0.0.2] - 2023-11-14
 
 - change(inventory): common vars are now parsed separately and are lower priority than var_dirs
