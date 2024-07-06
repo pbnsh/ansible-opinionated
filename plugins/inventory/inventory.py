@@ -174,7 +174,7 @@ def get_playbook(path: Path, identifier_prefix, include=None) -> dict:
                 role_name = item["vars"].get(f"{identifier_prefix}_role")
             if role_name is None:
                 continue
-            role_vars = item.get("vars", {})
+            role_vars = item.get("vars", {}) or {}
         if role_name is None:
             raise AnsibleParserError(
                 f"Failed to determine role name from  {role_filename}."
@@ -226,13 +226,12 @@ def get_inventory(
     return res
 
 
-def get_role_defaults(path: Path, identifier_prefix: str, playbook_vars: dict) -> dict:
+def get_role_defaults(path: Path, playbook_vars: dict) -> dict:
     """
     Parses roles/$role/defaults/main.yml, if base_role is defined in
     playbook_vars parses roles/$base_role/defaults/main.yml
 
     :param path: base path containing roles
-    :param identifier_prefix: internal var prefix
     :param playbook_vars: dict of playbook_vars
     :return: dict {"role_filename_without_extension": "vars"}
     """
@@ -293,6 +292,7 @@ def template_vars(jinja_env: jinja2, role_vars: dict) -> dict:
             jinja2.exceptions.UndefinedError,
             jinja2.exceptions.TemplateAssertionError,
             jinja2.exceptions.TemplateSyntaxError,
+            TypeError
         ):
             pass
 
@@ -311,6 +311,9 @@ def construct_hosts(role_vars: dict, jinja_env: jinja2.Environment) -> dict:
     if not hosts:
         return {}
 
+    if not isinstance(hosts, dict):
+        raise ValueError(f"failed to parse hosts key: {hosts}")
+
     res = {}
     templated_vars = template_vars(jinja_env, role_vars)
     for host, host_vars in hosts.items():
@@ -328,29 +331,34 @@ def construct_hosts(role_vars: dict, jinja_env: jinja2.Environment) -> dict:
     return res
 
 
-def get_vars(path: Path, directories: list, inventory_vars: dict) -> dict:
+def get_vars(path: Path, directories: list) -> dict:
     """
     Looks for var files in ansible-root/vars/$identifier_prefix_$dir_name/$var_value_defined
     in inventory.
 
     :param path: path to vars directory
     :param directories: list of directories to search for
-    :param inventory_vars: dict of existing inventory variables
 
     :return: dict {"var_name": "var_value"}
     """
+
+    if not path.is_dir():
+        return {}
+
     res = {}
-    for dir_name in directories:
-        if dir_name not in inventory_vars:
+    for subdirectory in path.iterdir():
+        if not subdirectory.is_dir():
             continue
-        var_file = inventory_vars[dir_name]
-        if not isinstance(var_file, str):
+        if subdirectory.stem not in directories:
             continue
-        for file in path.joinpath(dir_name).glob(f"{var_file}.y*"):
-            if file.suffix not in [".yml", ".yaml"]:
+        for item in subdirectory.iterdir():
+            if not item.is_file():
                 continue
-            contents = data_loader.load_from_file(str(file))
-            res |= contents or {}
+            if item.suffix not in [".yml", ".yaml"]:
+                continue
+            contents = data_loader.load_from_file(str(item))
+            res.setdefault(subdirectory.stem, {}).update({item.stem: contents})
+
     return res
 
 
@@ -401,30 +409,38 @@ class InventoryModule(BaseInventoryPlugin):
         if self.get_option("role_source") == "playbooks":
             roles = list(playbook_vars.keys())
 
-        role_defaults = get_role_defaults(
-            root_path / "roles", identifier_prefix, playbook_vars
-        )
+        role_defaults = get_role_defaults(root_path / "roles", playbook_vars)
 
-        _vars = get_vars(
-            root_path / "vars", self.get_option("var_dirs"), inventory_vars
-        )
+        var_dirs = get_vars(root_path / "vars", self.get_option("var_dirs"))
 
         for role in roles:
             self.inventory.add_group(role)
-
             role_vars = role_defaults.get(role, {})
             role_vars |= common_vars
-            role_vars |= _vars
+            role_group_vars = {**role_vars, **group_vars.get(role, {})}
+            for identifier_var, _vars in var_dirs.items():
+                if identifier_var not in role_group_vars:
+                    continue
+                identifier_var_value = role_group_vars[identifier_var]
+                if identifier_var_value not in _vars:
+                    continue
+                role_vars |= _vars[identifier_var_value]
+
             role_vars |= inventory_vars
             role_vars |= role_inventory_override(role_vars, identifier_prefix)
             role_vars |= group_vars.get(role, {})
             role_vars |= playbook_vars.get(role, {})
             for k, v in role_vars.items():
+
                 if k in ["hosts", f"{identifier_prefix}_inventory_override"]:
                     continue
                 self.inventory.set_variable(role, k, v)
 
-            hosts = construct_hosts(role_vars, jinja_env)
+            try:
+                hosts = construct_hosts(role_vars, jinja_env)
+            except ValueError as e:
+                raise AnsibleParserError(f"role: {role}, {e}")
+
             dns_domain = role_vars.get(
                 f"{identifier_prefix}_dns_domain",
                 f"{identifier_prefix}_dns_domain_not_set",

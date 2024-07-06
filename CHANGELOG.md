@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [0.0.4] - 2024-07-06
+
+- change(inventory): fix when hosts is None, ignore TypeError when trying to template hostname
+
 ## [0.0.3] - 2023-11-19
 
 - change(inventory): treat base_role as regular variable, fix role_name lookup

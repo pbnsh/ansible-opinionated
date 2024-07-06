@@ -148,7 +148,7 @@ class TestOpInventory(unittest.TestCase):
         playbook_vars = {"test": {"test_role": "test", "base_role": "base_role"}}
 
         role_defaults = get_role_defaults(
-            self.test_dir / "roles", "test", playbook_vars
+            self.test_dir / "roles", playbook_vars
         )
         self.assertEqual(role_defaults, {"test": {"base_role_var": "initial"}})
 
@@ -324,11 +324,19 @@ class TestOpInventory(unittest.TestCase):
         inventory_vars = {"test_provider": "proxmox", "test_env": "prod"}
 
         p = self.test_dir / "vars"
+        from pprint import pprint
+
+        pprint(get_vars(p, vars_dirs))
         self.assertEqual(
-            get_vars(p, vars_dirs, inventory_vars),
+            get_vars(p, vars_dirs),
             {
-                "variable_one": "prod",
-                "variable_two": "proxmox",
-                "variable_three": "prod",
+                "test_env": {
+                    "dev": {"variable_three": "dev", "variable_two": "dev"},
+                    "prod": {"variable_one": "prod", "variable_three": "prod"},
+                },
+                "test_provider": {
+                    "aws": {"variable_one": "aws"},
+                    "proxmox": {"variable_one": "proxmox", "variable_two": "proxmox"},
+                },
             },
         )
