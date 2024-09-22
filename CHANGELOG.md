@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [0.0.5] - 2024-09-22
+
+- change(inventory): drop role_source, fix ranged hosts, docs update
+
 ## [0.0.4] - 2024-07-06
 
 - change(inventory): fix when hosts is None, ignore TypeError when trying to template hostname
