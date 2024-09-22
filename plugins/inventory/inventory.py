@@ -26,19 +26,6 @@ options:
         ini:
           - section: pbn_op_inventory
             key: root_dir
-    role_source:
-        description:
-          - Source of roles that are considered part of inventory.
-          - When set to 'inventory', will use inventory/$site/$env/ as a source for groups.
-          - When set to 'playbooks', will use playbooks/ directory as a source for groups.
-        type: string
-        default: inventory
-        choices: ['inventory', 'playbooks']
-        env:
-          - name: ANSIBLE_OP_INVENTORY_ROLE_SOURCE
-        ini:
-          - section: pbn_op_inventory
-            key: role_source
     identifier_prefix:
         description:
           - Prefix used to denote internal vars, defaults to 'pbn'.
@@ -63,10 +50,8 @@ options:
             key: inventory_var_files
     var_dirs:
         description:
-          - List of directories of additional vars that will me merged in defined order.
-          - Used to load additional variables,inventory contains pbn_env variable
-          - with value dev and if ansible_root/vars/pbn_env/dev.yml exist, it
-          - will be processed.
+          - List of directories defined as $identifier_prefix_$name which contain
+          - values of $identifier_prefix_$name as yaml files.
         type: list
         default: []
         elements: string
@@ -101,7 +86,7 @@ from ansible.plugins.inventory import (
 )
 from ansible.parsing.dataloader import DataLoader
 from ansible.utils.display import Display
-from ansible.errors import AnsibleParserError, AnsibleFileNotFound
+from ansible.errors import AnsibleError, AnsibleParserError, AnsibleFileNotFound
 from ansible.plugins.filter.core import FilterModule
 from ansible.template import is_possibly_template
 from ansible.module_utils.common.text.converters import to_text
@@ -113,12 +98,7 @@ data_loader = DataLoader()
 def get_root_path(path: Path, root_dir: str) -> Path:
     """
     Traverses up the path until root_dir is found.
-
-    :param path: path where to start search from
-    :param root_dir: path where end search
-    :return: absolute path to root_dir
     """
-
     while str(path) != path.root:
         if path.name == root_dir:
             return path
@@ -126,68 +106,28 @@ def get_root_path(path: Path, root_dir: str) -> Path:
     raise AnsibleParserError(f"Failed to find root_dir: {root_dir}, path: {path}")
 
 
+def get_contents(path: Path) -> dict:
+    return data_loader.load_from_file(str(path)) or {}
+
+
 def parse_path(path: Path, include=None) -> dict:
     """
     Searches for .yml, .yaml files at path, skips non yaml and files starting
     with underscore.
-
-    :param path: path where to search for .yml, .yaml files
-    :param include: list of files without extension to return if found
-    :return: dict {"file_name_without_extension": "contents_of_the_file"}
     """
     if include is None:
         include = []
 
-    display.vvv(to_text(f"pbn_op_inventory: path {str(path)}"))
+    display.vvv(to_text(f"pbn_op_inventory: path: {str(path)}"))
     for item in path.glob("*"):
         if item.suffix not in [".yml", ".yaml"] or item.stem.startswith("_"):
-            display.vvv(to_text(f"pbn_op_inventory: skipped {item}"))
+            display.vvv(to_text(f"pbn_op_inventory: skip: {item}"))
             continue
         if include and item.stem not in include:
-            display.vvv(to_text(f"pbn_op_inventory: excluded {item}"))
+            display.vvv(to_text(f"pbn_op_inventory: excluded: {item}"))
             continue
-        contents = data_loader.load_from_file(str(item))
-        if contents is None:
-            display.vvv(to_text(f"pbn_op_inventory: no contents {item}"))
-            contents = {}
-        display.vvv(to_text(f"pbn_op_inventory: yield {item}"))
-        yield item.stem, contents
-
-
-def get_playbook(path: Path, identifier_prefix, include=None) -> dict:
-    """
-    Parses playbooks, users $identifier_prefix_role as a role identifier.
-
-    :param path: path where to look for playbooks
-    :param identifier_prefix: internal var prefix
-    :param include: list of files to
-    :return: dict {"playbook_name_without_extension": "vars"}
-    """
-
-    res = {}
-    for role_filename, contents in parse_path(path, include):
-        role_name, role_vars = None, None
-        for item in contents:
-            if "hosts" in item:
-                role_name = item.get("hosts")
-            if "vars" in item:
-                role_name = item["vars"].get(f"{identifier_prefix}_role")
-            if role_name is None:
-                continue
-            role_vars = item.get("vars", {}) or {}
-        if role_name is None:
-            raise AnsibleParserError(
-                f"Failed to determine role name from  {role_filename}."
-            )
-        if role_filename != role_name:
-            raise AnsibleParserError(
-                f"Playbook name role var mismatch, playbook: {role_filename} "
-                f"role var: {role_name}."
-            )
-        res[role_name] = role_vars
-        # if we got role from hosts, role might not be defined via vars
-        res[role_name][f"{identifier_prefix}_role"] = role_name
-    return res
+        display.vvv(to_text(f"pbn_op_inventory: read: {item}"))
+        yield item.stem, get_contents(item)
 
 
 def get_inventory(
@@ -195,12 +135,6 @@ def get_inventory(
 ) -> dict:
     """
     Searches for var_files starting from path and stops at root_dir.
-
-    :param raise_on_missing: will error if any of var_files is not found
-    :param path: starts searching up the tree from path
-    :param var_files: list of files to search for
-    :param root_dir: directory where to stop search
-    :return: dict of var files merged in order, 0 being the least
     """
     var_files_copy = copy.copy(var_files)
     var_filepaths = []
@@ -217,12 +151,41 @@ def get_inventory(
 
     res = {}
     for var_filename in var_files:
+        display.vvv(to_text(f"pbn_op_inventory: inventory: {str(path / var_filename)}"))
         for variable_filepath in var_filepaths:
             if variable_filepath.name == var_filename:
-                contents = data_loader.load_from_file(str(variable_filepath))
-                if contents is None:
-                    continue
+                contents = get_contents(variable_filepath)
                 res.update(contents)
+    return res
+
+
+def get_playbook(path: Path, identifier_prefix, include=None) -> dict:
+    """
+    Parses playbooks, users $identifier_prefix_role as a role identifier.
+    """
+    res = {}
+    for role_filename, contents in parse_path(path, include):
+        role_name, role_vars = None, None
+        for item in contents:
+            if "hosts" in item:
+                role_name = item.get("hosts")
+            if "vars" in item:
+                role_name = item["vars"].get(f"{identifier_prefix}_role")
+            if role_name is None:
+                continue
+            role_vars = item.get("vars", {}) or {}
+        if role_name is None:
+            raise AnsibleParserError(
+                f"Failed to determine role name from {role_filename}."
+            )
+        if role_filename != role_name:
+            raise AnsibleParserError(
+                f"Playbook name role var mismatch, playbook: {role_filename} "
+                f"role var: {role_name}."
+            )
+        res[role_name] = role_vars
+        # if we got role from hosts, role might not be defined via vars
+        res[role_name][f"{identifier_prefix}_role"] = role_name
     return res
 
 
@@ -230,19 +193,15 @@ def get_role_defaults(path: Path, playbook_vars: dict) -> dict:
     """
     Parses roles/$role/defaults/main.yml, if base_role is defined in
     playbook_vars parses roles/$base_role/defaults/main.yml
-
-    :param path: base path containing roles
-    :param playbook_vars: dict of playbook_vars
-    :return: dict {"role_filename_without_extension": "vars"}
     """
-
     res = {}
     for role_name, role_vars in playbook_vars.items():
         defaults = path / role_name / "defaults" / "main.yml"
         if "base_role" in role_vars:
             defaults = path / role_vars["base_role"] / "defaults" / "main.yml"
         try:
-            res[role_name] = data_loader.load_from_file(str(defaults))
+            display.vvv(to_text(f"pbn_op_inventory: defaults: {str(path / defaults)}"))
+            res[role_name] = get_contents(defaults)
         except AnsibleFileNotFound:
             pass
     return res
@@ -250,15 +209,11 @@ def get_role_defaults(path: Path, playbook_vars: dict) -> dict:
 
 def role_inventory_override(role_vars: dict, identifier_prefix: str) -> dict:
     """
-    :param role_vars: dict of role variables
-    :param identifier_prefix: internal var prefix
-    :return: updated role_vars if any are overridden in $identifier_prefix_inventory_override
+    Overrides inventory variables with role_default inventory overrides.
     """
-
     inventory_override = role_vars.get(f"{identifier_prefix}_inventory_override", {})
     if not inventory_override:
         return {}
-
     common = f"{identifier_prefix}_common"
     res = inventory_override.get(common, {})
     for k, v in inventory_override.items():
@@ -274,9 +229,7 @@ def role_inventory_override(role_vars: dict, identifier_prefix: str) -> dict:
 
 def template_vars(jinja_env: jinja2, role_vars: dict) -> dict:
     """
-    :param jinja_env: jinja environment with ansible filters
-    :param role_vars: role_vars which will be used to template jinja strings
-    :return: templated role_vars
+    Templates all knows variables.
     """
     to_template = [
         k for k, v in role_vars.items() if is_possibly_template(v, jinja_env)
@@ -292,7 +245,7 @@ def template_vars(jinja_env: jinja2, role_vars: dict) -> dict:
             jinja2.exceptions.UndefinedError,
             jinja2.exceptions.TemplateAssertionError,
             jinja2.exceptions.TemplateSyntaxError,
-            TypeError
+            TypeError,
         ):
             pass
 
@@ -301,16 +254,12 @@ def template_vars(jinja_env: jinja2, role_vars: dict) -> dict:
 
 def construct_hosts(role_vars: dict, jinja_env: jinja2.Environment) -> dict:
     """
-    Constructs hosts from role_vars["hosts"] if found.
-
-    :param role_vars: role_vars
-    :param jinja_env: jinja environments, used to template variables in hosts keys
-    :return: dict {"host": "hostvars"}
+    Templates any host vars if found and construct hosts from ansible
+    ranges of hosts format.
     """
     hosts = role_vars.get("hosts") or {}
     if not hosts:
         return {}
-
     if not isinstance(hosts, dict):
         raise ValueError(f"failed to parse hosts key: {hosts}")
 
@@ -322,12 +271,14 @@ def construct_hosts(role_vars: dict, jinja_env: jinja2.Environment) -> dict:
             hostname = jinja_env.from_string(host).render(**templated_vars)
         ranged_hostnames = [hostname]
         if detect_range(hostname):
-            ranged_hostnames = expand_hostname_range(hostname)
+            try:
+                ranged_hostnames = expand_hostname_range(hostname)
+            except AnsibleError:
+                pass
         for item in ranged_hostnames:
             res[item] = {}
             if host_vars is not None and isinstance(host_vars, dict):
                 res[item] = host_vars
-
     return res
 
 
@@ -335,18 +286,13 @@ def get_vars(path: Path, directories: list) -> dict:
     """
     Looks for var files in ansible-root/vars/$identifier_prefix_$dir_name/$var_value_defined
     in inventory.
-
-    :param path: path to vars directory
-    :param directories: list of directories to search for
-
-    :return: dict {"var_name": "var_value"}
     """
-
     if not path.is_dir():
         return {}
 
     res = {}
     for subdirectory in path.iterdir():
+        display.vvv(to_text(f"pbn_op_inventory: get_vas: {str(subdirectory)}"))
         if not subdirectory.is_dir():
             continue
         if subdirectory.stem not in directories:
@@ -356,9 +302,9 @@ def get_vars(path: Path, directories: list) -> dict:
                 continue
             if item.suffix not in [".yml", ".yaml"]:
                 continue
-            contents = data_loader.load_from_file(str(item))
+            display.vvv(to_text(f"pbn_op_inventory: vars: {str(subdirectory / item)}"))
+            contents = get_contents(item)
             res.setdefault(subdirectory.stem, {}).update({item.stem: contents})
-
     return res
 
 
@@ -400,28 +346,25 @@ class InventoryModule(BaseInventoryPlugin):
             inventory_path, self.get_option("inventory_var_files"), root_path.stem
         )
         group_vars = dict(parse_path(inventory_path))
-
-        roles = []
-        if self.get_option("role_source") == "inventory":
-            roles = list(group_vars.keys())
-
+        roles = list(group_vars.keys())
         playbook_vars = get_playbook(root_path / "playbooks", identifier_prefix, roles)
-        if self.get_option("role_source") == "playbooks":
-            roles = list(playbook_vars.keys())
-
         role_defaults = get_role_defaults(root_path / "roles", playbook_vars)
-
         var_dirs = get_vars(root_path / "vars", self.get_option("var_dirs"))
 
         for role in roles:
+            display.vvv(to_text(f"pbn_op_inventory: role: {role}"))
             self.inventory.add_group(role)
             role_vars = role_defaults.get(role, {})
             role_vars |= common_vars
-            role_group_vars = {**role_vars, **group_vars.get(role, {})}
+            role_group_inventory_vars = {
+                **role_vars,
+                **group_vars.get(role, {}),
+                **inventory_vars,
+            }
             for identifier_var, _vars in var_dirs.items():
-                if identifier_var not in role_group_vars:
+                if identifier_var not in role_group_inventory_vars.keys():
                     continue
-                identifier_var_value = role_group_vars[identifier_var]
+                identifier_var_value = role_group_inventory_vars[identifier_var]
                 if identifier_var_value not in _vars:
                     continue
                 role_vars |= _vars[identifier_var_value]
@@ -431,13 +374,13 @@ class InventoryModule(BaseInventoryPlugin):
             role_vars |= group_vars.get(role, {})
             role_vars |= playbook_vars.get(role, {})
             for k, v in role_vars.items():
-
                 if k in ["hosts", f"{identifier_prefix}_inventory_override"]:
                     continue
                 self.inventory.set_variable(role, k, v)
 
             try:
                 hosts = construct_hosts(role_vars, jinja_env)
+                display.vvv(to_text(f"pbn_op_inventory: hosts: {hosts}"))
             except ValueError as e:
                 raise AnsibleParserError(f"role: {role}, {e}")
 
