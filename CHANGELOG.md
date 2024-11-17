@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [0.0.6] - 2024-11-17
+
+- change(inventory): use DEFAULT_ROLES_PATH when searching for role defaults
+
 ## [0.0.5] - 2024-09-22
 
 - change(inventory): drop role_source, fix ranged hosts, docs update
