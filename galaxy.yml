@@ -1,8 +1,7 @@
 ---
 namespace: pbn
-# name: opinionated
 name: op
-version: 0.0.5
+version: 0.0.6
 readme: README.md
 authors:
   - pbn <in+github@pbn.sh>
