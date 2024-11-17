@@ -90,6 +90,7 @@ from ansible.errors import AnsibleError, AnsibleParserError, AnsibleFileNotFound
 from ansible.plugins.filter.core import FilterModule
 from ansible.template import is_possibly_template
 from ansible.module_utils.common.text.converters import to_text
+from ansible import constants
 
 display = Display()
 data_loader = DataLoader()
@@ -189,21 +190,23 @@ def get_playbook(path: Path, identifier_prefix, include=None) -> dict:
     return res
 
 
-def get_role_defaults(path: Path, playbook_vars: dict) -> dict:
+def get_role_defaults(paths: list[str], playbook_vars: dict) -> dict:
     """
     Parses roles/$role/defaults/main.yml, if base_role is defined in
     playbook_vars parses roles/$base_role/defaults/main.yml
     """
     res = {}
     for role_name, role_vars in playbook_vars.items():
-        defaults = path / role_name / "defaults" / "main.yml"
-        if "base_role" in role_vars:
-            defaults = path / role_vars["base_role"] / "defaults" / "main.yml"
-        try:
-            display.vvv(to_text(f"pbn_op_inventory: defaults: {str(path / defaults)}"))
-            res[role_name] = get_contents(defaults)
-        except AnsibleFileNotFound:
-            pass
+        for path in paths:
+            path = Path(path)
+            defaults = path / role_name / "defaults" / "main.yml"
+            if "base_role" in role_vars:
+                defaults = path / role_vars["base_role"] / "defaults" / "main.yml"
+            try:
+                display.vvv(to_text(f"pbn_op_inventory: defaults: {str(path / defaults)}"))
+                res[role_name] = get_contents(defaults)
+            except AnsibleFileNotFound:
+                pass
     return res
 
 
@@ -292,7 +295,7 @@ def get_vars(path: Path, directories: list) -> dict:
 
     res = {}
     for subdirectory in path.iterdir():
-        display.vvv(to_text(f"pbn_op_inventory: get_vas: {str(subdirectory)}"))
+        display.vvv(to_text(f"pbn_op_inventory: get_vars: {str(subdirectory)}"))
         if not subdirectory.is_dir():
             continue
         if subdirectory.stem not in directories:
@@ -348,7 +351,7 @@ class InventoryModule(BaseInventoryPlugin):
         group_vars = dict(parse_path(inventory_path))
         roles = list(group_vars.keys())
         playbook_vars = get_playbook(root_path / "playbooks", identifier_prefix, roles)
-        role_defaults = get_role_defaults(root_path / "roles", playbook_vars)
+        role_defaults = get_role_defaults(constants.DEFAULT_ROLES_PATH, playbook_vars)
         var_dirs = get_vars(root_path / "vars", self.get_option("var_dirs"))
 
         for role in roles:

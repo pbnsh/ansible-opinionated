@@ -148,7 +148,7 @@ class TestOpInventory(unittest.TestCase):
         playbook_vars = {"test": {"test_role": "test", "base_role": "base_role"}}
 
         role_defaults = get_role_defaults(
-            self.test_dir / "roles", playbook_vars
+            [str(self.test_dir / "roles")], playbook_vars
         )
         self.assertEqual(role_defaults, {"test": {"base_role_var": "initial"}})
 
