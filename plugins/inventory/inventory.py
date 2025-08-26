@@ -88,12 +88,23 @@ from ansible.parsing.dataloader import DataLoader
 from ansible.utils.display import Display
 from ansible.errors import AnsibleError, AnsibleParserError, AnsibleFileNotFound
 from ansible.plugins.filter.core import FilterModule
-from ansible.template import is_possibly_template
+from ansible.module_utils.six import string_types
 from ansible.module_utils.common.text.converters import to_text
 from ansible import constants
 
 display = Display()
 data_loader = DataLoader()
+
+
+def is_possibly_template(data, jinja_env):
+    """
+    Taken for ansible-core 2.18.x
+    """
+    if isinstance(data, string_types):
+        for marker in (jinja_env.block_start_string, jinja_env.variable_start_string, jinja_env.comment_start_string):
+            if marker in data:
+                return True
+    return False
 
 
 def get_root_path(path: Path, root_dir: str) -> Path:

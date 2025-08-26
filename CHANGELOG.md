@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [0.0.7] - 2025-08-26
+
+- change(inventory): workaround for is_possibly_template on with ansible-core 2.19+
+
 ## [0.0.6] - 2024-11-17
 
 - change(inventory): use DEFAULT_ROLES_PATH when searching for role defaults
